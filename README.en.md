@@ -351,6 +351,7 @@ Queue limit = DS2API_ACCOUNT_MAX_QUEUE (default = recommended concurrency)
 When `tools` is present in the request, DS2API performs anti-leak handling:
 
 1. Toolcall feature matching is enabled only in **non-code-block context** (fenced examples are ignored)
+   - In non-code-block context, tool JSON may still be recognized even when mixed with normal prose; surrounding prose can remain as text output.
 2. `responses` streaming strictly uses official item lifecycle events (`response.output_item.*`, `response.content_part.*`, `response.function_call_arguments.*`)
 3. Tool names not declared in the `tools` schema are strictly rejected and will not be emitted as valid tool calls
 4. `responses` supports and enforces `tool_choice` (`auto`/`none`/`required`/forced function); `required` violations return `422` for non-stream and `response.failed` for stream

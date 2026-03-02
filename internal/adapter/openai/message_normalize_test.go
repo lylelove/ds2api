@@ -193,3 +193,17 @@ func TestNormalizeOpenAIMessagesForPrompt_PreservesConcatenatedToolArguments(t *
 		t.Fatalf("expected original concatenated arguments in tool history, got %q", content)
 	}
 }
+
+func TestNormalizeOpenAIMessagesForPrompt_DeveloperRoleMapsToSystem(t *testing.T) {
+	raw := []any{
+		map[string]any{"role": "developer", "content": "必须先走工具调用"},
+		map[string]any{"role": "user", "content": "你好"},
+	}
+	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
+	if len(normalized) != 2 {
+		t.Fatalf("expected 2 normalized messages, got %d", len(normalized))
+	}
+	if normalized[0]["role"] != "system" {
+		t.Fatalf("expected developer role converted to system, got %#v", normalized[0]["role"])
+	}
+}

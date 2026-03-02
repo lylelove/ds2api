@@ -15,19 +15,9 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 	}
 	events := make([]toolStreamEvent, 0, 2)
 	if len(state.pendingToolCalls) > 0 {
-		pending := state.pending.String()
-		if strings.TrimSpace(pending) != "" {
-			content := state.pendingToolRaw + pending
-			state.pending.Reset()
-			state.pendingToolRaw = ""
-			state.pendingToolCalls = nil
-			state.noteText(content)
-			events = append(events, toolStreamEvent{Content: content})
-		} else {
-			// Wait for either more non-whitespace content (demote to plain text)
-			// or stream flush (promote to executable tool calls).
-			return events
-		}
+		events = append(events, toolStreamEvent{ToolCalls: state.pendingToolCalls})
+		state.pendingToolRaw = ""
+		state.pendingToolCalls = nil
 	}
 
 	for {
@@ -45,7 +35,14 @@ func processToolSieveChunk(state *toolStreamSieveState, chunk string, toolNames 
 			state.capturing = false
 			state.resetIncrementalToolState()
 			if len(calls) > 0 {
-				state.pendingToolRaw = captured
+				if prefix != "" {
+					state.noteText(prefix)
+					events = append(events, toolStreamEvent{Content: prefix})
+				}
+				if suffix != "" {
+					state.pending.WriteString(suffix)
+				}
+				_ = captured
 				state.pendingToolCalls = calls
 				continue
 			}
@@ -209,11 +206,6 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 	prefixPart := captured[:start]
 	suffixPart := captured[end:]
 	if insideCodeFence(state.recentTextTail + prefixPart) {
-		return captured, nil, "", true
-	}
-	// Strict mode: only standalone tool payloads are executable. If the
-	// payload is wrapped by non-whitespace prose, keep it as plain text.
-	if strings.TrimSpace(state.recentTextTail) != "" || strings.TrimSpace(prefixPart) != "" || strings.TrimSpace(suffixPart) != "" {
 		return captured, nil, "", true
 	}
 	parsed := util.ParseStandaloneToolCallsDetailed(obj, toolNames)

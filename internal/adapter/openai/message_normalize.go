@@ -33,9 +33,9 @@ func normalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]an
 				"role":    "user",
 				"content": formatToolResultForPrompt(msg),
 			})
-		case "user", "system":
+		case "user", "system", "developer":
 			out = append(out, map[string]any{
-				"role":    role,
+				"role":    normalizeOpenAIRoleForPrompt(role),
 				"content": normalizeOpenAIContentForPrompt(msg["content"]),
 			})
 		default:
@@ -47,7 +47,7 @@ func normalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]an
 				role = "user"
 			}
 			out = append(out, map[string]any{
-				"role":    role,
+				"role":    normalizeOpenAIRoleForPrompt(role),
 				"content": content,
 			})
 		}
@@ -187,6 +187,14 @@ func marshalToPromptString(v any) string {
 		return strings.TrimSpace(fmt.Sprintf("%v", v))
 	}
 	return string(b)
+}
+
+func normalizeOpenAIRoleForPrompt(role string) string {
+	role = strings.ToLower(strings.TrimSpace(role))
+	if role == "developer" {
+		return "system"
+	}
+	return role
 }
 
 func asString(v any) string {

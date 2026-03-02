@@ -51,7 +51,7 @@ DS2API 提供两个层级的测试：
 1. **Preflight 检查**：
    - `go test ./... -count=1`（单元测试）
    - `./tests/scripts/check-node-split-syntax.sh`（Node 拆分模块语法门禁）
-   - `node --test api/helpers/stream-tool-sieve.test.js api/chat-stream.test.js api/compat/js_compat_test.js`（Node 流式拦截 + compat 单测）
+   - `node --test`（如仓库存在 Node 单测文件时执行；当前默认以 Go 测试 + Node 语法门禁为主）
    - `npm run build --prefix webui`（WebUI 构建检查）
 
 2. **隔离启动**：复制 `config.json` 到临时目录，启动独立服务进程

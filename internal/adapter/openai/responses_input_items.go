@@ -29,7 +29,7 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 			return nil
 		}
 		return map[string]any{
-			"role":    role,
+			"role":    normalizeOpenAIRoleForPrompt(role),
 			"content": content,
 		}
 	}
@@ -51,7 +51,7 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 			role = "user"
 		}
 		return map[string]any{
-			"role":    role,
+			"role":    normalizeOpenAIRoleForPrompt(role),
 			"content": content,
 		}
 	case "function_call_output", "tool_result":

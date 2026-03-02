@@ -513,8 +513,8 @@ func TestHandleStreamToolCallMixedWithPlainTextSegments(t *testing.T) {
 	if !done {
 		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
 	}
-	if streamHasToolCallsDelta(frames) {
-		t.Fatalf("did not expect tool_calls delta in mixed prose stream, body=%s", rec.Body.String())
+	if !streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected tool_calls delta in mixed prose stream, body=%s", rec.Body.String())
 	}
 	content := strings.Builder{}
 	for _, frame := range frames {
@@ -531,11 +531,8 @@ func TestHandleStreamToolCallMixedWithPlainTextSegments(t *testing.T) {
 	if !strings.Contains(got, "下面是示例：") || !strings.Contains(got, "请勿执行。") {
 		t.Fatalf("expected pre/post plain text to pass sieve, got=%q", got)
 	}
-	if !strings.Contains(strings.ToLower(got), `"tool_calls"`) {
-		t.Fatalf("expected embedded tool json to remain text in strict mode, got=%q", got)
-	}
-	if streamFinishReason(frames) != "stop" {
-		t.Fatalf("expected finish_reason=stop for mixed prose, body=%s", rec.Body.String())
+	if streamFinishReason(frames) != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls for mixed prose, body=%s", rec.Body.String())
 	}
 }
 
@@ -555,8 +552,8 @@ func TestHandleStreamToolCallAfterLeadingTextRemainsText(t *testing.T) {
 	if !done {
 		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
 	}
-	if streamHasToolCallsDelta(frames) {
-		t.Fatalf("did not expect tool_calls delta, body=%s", rec.Body.String())
+	if !streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
 	}
 	content := strings.Builder{}
 	for _, frame := range frames {
@@ -573,11 +570,9 @@ func TestHandleStreamToolCallAfterLeadingTextRemainsText(t *testing.T) {
 	if !strings.Contains(got, "我将调用工具。") {
 		t.Fatalf("expected leading text to keep streaming, got=%q", got)
 	}
-	if !strings.Contains(strings.ToLower(got), "tool_calls") {
-		t.Fatalf("expected tool_calls example text preserved, got=%q", got)
-	}
-	if streamFinishReason(frames) != "stop" {
-		t.Fatalf("expected finish_reason=stop, body=%s", rec.Body.String())
+
+	if streamFinishReason(frames) != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls, body=%s", rec.Body.String())
 	}
 }
 
@@ -596,8 +591,8 @@ func TestHandleStreamToolCallWithSameChunkTrailingTextRemainsText(t *testing.T) 
 	if !done {
 		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
 	}
-	if streamHasToolCallsDelta(frames) {
-		t.Fatalf("did not expect tool_calls delta, body=%s", rec.Body.String())
+	if !streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
 	}
 	content := strings.Builder{}
 	for _, frame := range frames {
@@ -614,8 +609,45 @@ func TestHandleStreamToolCallWithSameChunkTrailingTextRemainsText(t *testing.T) 
 	if !strings.Contains(got, "接下来我会继续说明。") {
 		t.Fatalf("expected trailing plain text to be preserved, got=%q", got)
 	}
-	if !strings.Contains(strings.ToLower(got), "tool_calls") {
-		t.Fatalf("expected tool_calls example text preserved, got=%q", got)
+
+	if streamFinishReason(frames) != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls, body=%s", rec.Body.String())
+	}
+}
+
+func TestHandleStreamFencedToolCallSnippetRemainsText(t *testing.T) {
+	h := &Handler{}
+	resp := makeSSEHTTPResponse(
+		fmt.Sprintf(`data: {"p":"response/content","v":%q}`, "下面是调用示例：\n```json\n"),
+		fmt.Sprintf(`data: {"p":"response/content","v":%q}`, "{\"tool_calls\":[{\"name\":\"search\",\"input\":{\"q\":\"go\"}}]}\n```\n仅示例，不要执行。"),
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h.handleStream(rec, req, resp, "cid7f", "deepseek-chat", "prompt", false, false, []string{"search"})
+
+	frames, done := parseSSEDataFrames(t, rec.Body.String())
+	if !done {
+		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
+	}
+	if streamHasToolCallsDelta(frames) {
+		t.Fatalf("did not expect tool_calls delta for fenced snippet, body=%s", rec.Body.String())
+	}
+	content := strings.Builder{}
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			if c, ok := delta["content"].(string); ok {
+				content.WriteString(c)
+			}
+		}
+	}
+	got := content.String()
+	if !strings.Contains(got, "```json") || !strings.Contains(strings.ToLower(got), "tool_calls") {
+		t.Fatalf("expected fenced tool snippet in content, got=%q", got)
 	}
 	if streamFinishReason(frames) != "stop" {
 		t.Fatalf("expected finish_reason=stop, body=%s", rec.Body.String())
@@ -640,8 +672,8 @@ func TestHandleStreamToolCallKeyAppearsLateRemainsText(t *testing.T) {
 	if !done {
 		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
 	}
-	if streamHasToolCallsDelta(frames) {
-		t.Fatalf("did not expect tool_calls delta, body=%s", rec.Body.String())
+	if !streamHasToolCallsDelta(frames) {
+		t.Fatalf("expected tool_calls delta, body=%s", rec.Body.String())
 	}
 	content := strings.Builder{}
 	for _, frame := range frames {
@@ -655,14 +687,11 @@ func TestHandleStreamToolCallKeyAppearsLateRemainsText(t *testing.T) {
 		}
 	}
 	got := content.String()
-	if !strings.Contains(strings.ToLower(got), "tool_calls") || !strings.Contains(got, "{") {
-		t.Fatalf("expected embedded tool json to remain in text, got=%q", got)
-	}
 	if !strings.Contains(got, "后置正文C。") {
 		t.Fatalf("expected stream to continue after tool json convergence, got=%q", got)
 	}
-	if streamFinishReason(frames) != "stop" {
-		t.Fatalf("expected finish_reason=stop, body=%s", rec.Body.String())
+	if streamFinishReason(frames) != "tool_calls" {
+		t.Fatalf("expected finish_reason=tool_calls, body=%s", rec.Body.String())
 	}
 }
 

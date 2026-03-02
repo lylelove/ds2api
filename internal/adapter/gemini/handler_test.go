@@ -99,7 +99,7 @@ func TestGeminiRoutesRegistered(t *testing.T) {
 
 func TestGenerateContentReturnsFunctionCallParts(t *testing.T) {
 	upstream := makeGeminiUpstreamResponse(
-		`data: {"p":"response/content","v":"我来调用工具\n{\"tool_calls\":[{\"name\":\"eval_javascript\",\"input\":{\"code\":\"1+1\"}}]}"}`,
+		`data: {"p":"response/content","v":"{\"tool_calls\":[{\"name\":\"eval_javascript\",\"input\":{\"code\":\"1+1\"}}]}"}`,
 		`data: [DONE]`,
 	)
 	h := &Handler{
@@ -140,6 +140,42 @@ func TestGenerateContentReturnsFunctionCallParts(t *testing.T) {
 	functionCall, _ := part0["functionCall"].(map[string]any)
 	if functionCall["name"] != "eval_javascript" {
 		t.Fatalf("expected functionCall name eval_javascript, got %#v", functionCall)
+	}
+}
+
+func TestGenerateContentMixedToolSnippetAlsoTriggersFunctionCall(t *testing.T) {
+	upstream := makeGeminiUpstreamResponse(
+		`data: {"p":"response/content","v":"我来调用工具\n{\"tool_calls\":[{\"name\":\"eval_javascript\",\"input\":{\"code\":\"1+1\"}}]}"}`,
+		`data: [DONE]`,
+	)
+	h := &Handler{Store: testGeminiConfig{}, Auth: testGeminiAuth{}, DS: testGeminiDS{resp: upstream}}
+	r := chi.NewRouter()
+	RegisterRoutes(r, h)
+
+	body := `{
+		"contents":[{"role":"user","parts":[{"text":"call tool"}]}],
+		"tools":[{"functionDeclarations":[{"name":"eval_javascript","description":"eval","parameters":{"type":"object","properties":{"code":{"type":"string"}}}}]}]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:generateContent", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer direct-token")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	candidates, _ := out["candidates"].([]any)
+	c0, _ := candidates[0].(map[string]any)
+	content, _ := c0["content"].(map[string]any)
+	parts, _ := content["parts"].([]any)
+	part0, _ := parts[0].(map[string]any)
+	functionCall, _ := part0["functionCall"].(map[string]any)
+	if functionCall["name"] != "eval_javascript" {
+		t.Fatalf("expected functionCall name eval_javascript for mixed snippet, got %#v", functionCall)
 	}
 }
 

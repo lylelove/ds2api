@@ -115,3 +115,25 @@ func TestParseStandaloneToolCallsIgnoresFencedCodeBlock(t *testing.T) {
 		t.Fatalf("expected fenced tool_call example to be ignored, got %#v", calls)
 	}
 }
+
+func TestParseToolCallsAllowsQualifiedToolName(t *testing.T) {
+	text := `{"tool_calls":[{"name":"mcp.search_web","input":{"q":"golang"}}]}`
+	calls := ParseToolCalls(text, []string{"search_web"})
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v", calls)
+	}
+	if calls[0].Name != "search_web" {
+		t.Fatalf("expected canonical tool name search_web, got %q", calls[0].Name)
+	}
+}
+
+func TestParseToolCallsAllowsPunctuationVariantToolName(t *testing.T) {
+	text := `{"tool_calls":[{"name":"read-file","input":{"path":"README.md"}}]}`
+	calls := ParseToolCalls(text, []string{"read_file"})
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v", calls)
+	}
+	if calls[0].Name != "read_file" {
+		t.Fatalf("expected canonical tool name read_file, got %q", calls[0].Name)
+	}
+}

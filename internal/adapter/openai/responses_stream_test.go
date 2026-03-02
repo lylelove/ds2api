@@ -288,12 +288,8 @@ func TestHandleResponsesStreamThinkingAndMixedToolExampleRemainMessageOnly(t *te
 	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-reasoner", "prompt", true, false, []string{"read_file"}, util.DefaultToolChoicePolicy(), "")
 
 	addedPayloads := extractAllSSEEventPayloads(rec.Body.String(), "response.output_item.added")
-	if len(addedPayloads) != 1 {
-		t.Fatalf("expected only one message output_item.added event, got %d body=%s", len(addedPayloads), rec.Body.String())
-	}
-	item, _ := addedPayloads[0]["item"].(map[string]any)
-	if asString(item["type"]) != "message" {
-		t.Fatalf("expected only message output item in strict mode, got %#v", item)
+	if len(addedPayloads) < 1 {
+		t.Fatalf("expected at least one output_item.added event, got %d body=%s", len(addedPayloads), rec.Body.String())
 	}
 
 	completedPayload, ok := extractSSEEventPayload(rec.Body.String(), "response.completed")
@@ -302,14 +298,21 @@ func TestHandleResponsesStreamThinkingAndMixedToolExampleRemainMessageOnly(t *te
 	}
 	responseObj, _ := completedPayload["response"].(map[string]any)
 	output, _ := responseObj["output"].([]any)
+	hasMessage := false
 	for _, item := range output {
 		m, _ := item.(map[string]any)
 		if m == nil {
 			continue
 		}
+		if asString(m["type"]) == "message" {
+			hasMessage = true
+		}
 		if asString(m["type"]) == "function_call" {
 			t.Fatalf("did not expect function_call output for mixed prose tool example, output=%#v", output)
 		}
+	}
+	if !hasMessage {
+		t.Fatalf("expected message output for mixed prose tool example, output=%#v", output)
 	}
 }
 

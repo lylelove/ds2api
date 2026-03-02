@@ -284,6 +284,11 @@ data: [DONE]
 
 **流式**：命中高置信特征后立即输出 `delta.tool_calls`（不等待完整 JSON 闭合），并持续发送 arguments 增量；已确认的 toolcall 原始 JSON 不会回流到 `delta.content`。
 
+补充说明：
+
+- **非代码块上下文**下，工具 JSON 即使与普通文本混合，也会按特征识别并产出可执行 tool call（前后普通文本仍可透传）。
+- Markdown fenced code block（例如 ```json ... ```）中的 `tool_calls` 仅视为示例文本，不会被执行。
+
 ---
 
 ### `GET /v1/models/{id}`
@@ -301,7 +306,7 @@ OpenAI Responses 风格接口，兼容 `input` 或 `messages`。
 | `messages` | array | ❌ | 与 `input` 二选一 |
 | `instructions` | string | ❌ | 自动前置为 system 消息 |
 | `stream` | boolean | ❌ | 默认 `false` |
-| `tools` | array | ❌ | 与 chat 同样的工具识别与转译策略 |
+| `tools` | array | ❌ | 与 chat 同样的工具识别与转译策略（含代码块示例豁免） |
 | `tool_choice` | string/object | ❌ | 支持 `auto`/`none`/`required` 与强制函数（`{"type":"function","name":"..."}`） |
 
 **非流式响应**：返回标准 `response` 对象，`id` 形如 `resp_xxx`，并写入内存 TTL 存储。
