@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -121,6 +122,35 @@ func TestEnvBackedStoreWritebackBootstrapsMissingConfigFile(t *testing.T) {
 	accounts := reloaded.Accounts()
 	if len(accounts) != 2 {
 		t.Fatalf("expected 2 accounts after reload, got %d", len(accounts))
+	}
+}
+
+func TestEnvBackedStoreWritebackDoesNotBootstrapOnInvalidEnvJSON(t *testing.T) {
+	tmp, err := os.CreateTemp(t.TempDir(), "config-*.json")
+	if err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+	path := tmp.Name()
+	_ = tmp.Close()
+	_ = os.Remove(path)
+
+	t.Setenv("DS2API_CONFIG_JSON", "{invalid-json")
+	t.Setenv("CONFIG_JSON", "")
+	t.Setenv("DS2API_CONFIG_PATH", path)
+	t.Setenv("DS2API_ENV_WRITEBACK", "1")
+
+	cfg, fromEnv, loadErr := loadConfig()
+	if loadErr == nil {
+		t.Fatalf("expected loadConfig error for invalid env json")
+	}
+	if !fromEnv {
+		t.Fatalf("expected fromEnv=true when parsing env config fails")
+	}
+	if len(cfg.Keys) != 0 || len(cfg.Accounts) != 0 {
+		t.Fatalf("expected empty config on parse failure, got keys=%d accounts=%d", len(cfg.Keys), len(cfg.Accounts))
+	}
+	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected no bootstrapped config file, stat err=%v", statErr)
 	}
 }
 

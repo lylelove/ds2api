@@ -47,6 +47,9 @@ func loadConfig() (Config, bool, error) {
 	}
 	if rawCfg != "" {
 		cfg, err := parseConfigString(rawCfg)
+		if err != nil {
+			return cfg, true, err
+		}
 		cfg.ClearAccountTokens()
 		cfg.DropInvalidAccounts()
 		if IsVercel() || !envWritebackEnabled() {
