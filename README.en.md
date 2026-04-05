@@ -76,7 +76,7 @@ flowchart LR
 - **Frontend**: React admin panel (`webui/`), served as static build at runtime
 - **Deployment**: local run, Docker, Vercel serverless, Linux systemd
 
-### 3.0 Architecture Changes (vs older releases)
+### 3.X Architecture Changes (vs older releases)
 
 - **Unified routing core**: all protocol entries are now centralized through `internal/server/router.go`, with OpenAI / Claude / Gemini / Admin / WebUI routes registered in one tree to avoid multi-entry drift.
 - **Unified execution chain**: Claude/Gemini entries are translated by `internal/translatorcliproxy`, then executed through `openai.ChatCompletions` for shared tool-calling and stream semantics, then translated back to the client protocol.
@@ -111,7 +111,6 @@ flowchart LR
 | P0 | Anthropic SDK (messages) | ✅ |
 | P0 | Google Gemini SDK (generateContent) | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI (OpenAI-compatible integration) | ✅ |
-| P2 | MCP standalone bridge | Planned |
 
 ## Model Support
 
@@ -289,7 +288,8 @@ cp opencode.json.example opencode.json
     "o3": "deepseek-reasoner"
   },
   "compat": {
-    "wide_input_strict_output": true
+    "wide_input_strict_output": true,
+    "strip_reference_markers": true
   },
   "responses": {
     "store_ttl_seconds": 900
@@ -311,7 +311,7 @@ cp opencode.json.example opencode.json
     "token_refresh_interval_hours": 6
   },
   "auto_delete": {
-    "sessions": false
+    "mode": "none"
   }
 }
 ```
@@ -321,7 +321,8 @@ cp opencode.json.example opencode.json
 - `token`: Even if set in `config.json`, it is cleared during load (DS2API does not read persisted tokens from config); runtime tokens are maintained/refreshed in memory only
 - `model_aliases`: Map common model names (GPT/Codex/Claude) to DeepSeek models
 - `compat.wide_input_strict_output`: Keep `true` (current default policy)
-- `toolcall`: Fixed to feature matching + high-confidence early emit, no longer configurable
+- `compat.strip_reference_markers`: Keep `true`; it strips reference markers from visible output
+- `toolcall`: Legacy field; the current behavior is fixed to feature matching + high-confidence early emit, and any config value is ignored
 - `responses.store_ttl_seconds`: In-memory TTL for `/v1/responses/{id}`
 - `embeddings.provider`: Embeddings provider (`deterministic/mock/builtin` built-in)
 - `claude_mapping`: Maps `fast`/`slow` suffixes to corresponding DeepSeek models (still compatible with `claude_model_mapping`)
@@ -444,6 +445,7 @@ ds2api/
 │   ├── deepseek/            # DeepSeek API client, PoW WASM
 │   ├── js/                  # Node runtime stream/compat logic
 │   ├── devcapture/          # Dev packet capture module
+│   ├── rawsample/           # Visible-text extraction and replay helpers for raw stream samples
 │   ├── format/              # Output formatting
 │   ├── prompt/              # Prompt construction
 │   ├── server/              # HTTP routing and middleware (chi router)
@@ -465,6 +467,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # Compatibility fixtures and expected outputs
 │   ├── node/                # Node-side unit tests (chat-stream / tool-sieve)
+│   ├── raw_stream_samples/  # Raw SSE samples and replay metadata
 │   └── scripts/             # Unified test script entrypoints (unit/e2e)
 ├── docs/                    # Deployment / contributing / testing docs
 ├── static/admin/            # WebUI build output (not committed to Git)

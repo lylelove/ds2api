@@ -139,7 +139,7 @@ docker-compose up -d --build
 The `Dockerfile` now provides two image paths:
 
 1. **Default local/dev path (`runtime-from-source`)**: a three-stage build (WebUI build + Go build + runtime).
-2. **Release path (`runtime-from-dist`)**: CI first creates `dist/ds2api_<tag>_linux_<arch>.tar.gz`, then Docker directly reuses the binary and `static/admin` assets from those release archives, without running `npm build`/`go build` again.
+2. **Release path (`runtime-from-dist`)**: the release workflow first creates tag-named release archives, then copies the Linux bundles to `dist/docker-input/linux_amd64.tar.gz` / `linux_arm64.tar.gz`; Docker consumes those prepared inputs directly, without rerunning `npm build`/`go build`.
 
 The release path keeps Docker images aligned with release archives and reduces duplicate build work.
 

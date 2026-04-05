@@ -139,7 +139,7 @@ docker-compose up -d --build
 `Dockerfile` 提供两条构建路径：
 
 1. **本地/开发默认路径（`runtime-from-source`）**：三阶段构建（WebUI 构建 + Go 构建 + 运行阶段）。
-2. **Release 路径（`runtime-from-dist`）**：CI 先生成 `dist/ds2api_<tag>_linux_<arch>.tar.gz`，再由 Docker 直接复用该发布包内的二进制和 `static/admin` 产物组装运行镜像，不再重复执行 `npm build`/`go build`。
+2. **Release 路径（`runtime-from-dist`）**：发布工作流先生成 tag 命名的 Release 压缩包，再把 Linux 产物复制成 `dist/docker-input/linux_amd64.tar.gz` / `linux_arm64.tar.gz`；Docker 构建阶段直接消费这些输入，不再重复执行 `npm build`/`go build`。
 
 Release 路径可确保 Docker 镜像与 release 压缩包使用同一套产物，减少重复构建带来的差异。
 

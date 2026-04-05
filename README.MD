@@ -76,7 +76,7 @@ flowchart LR
 - **前端**：React 管理台（`webui/`），运行时托管静态构建产物
 - **部署**：本地运行、Docker、Vercel Serverless、Linux systemd
 
-### 3.0 底层架构调整（相较旧版本）
+### 3.X 底层架构调整（相较旧版本）
 
 - **统一路由内核**：所有协议入口统一汇聚到 `internal/server/router.go`，并在同一路由树中注册 OpenAI / Claude / Gemini / Admin / WebUI 路由，避免多入口行为漂移。
 - **统一执行链路**：Claude / Gemini 入口先经 `internal/translatorcliproxy` 做协议转换，再进入 `openai.ChatCompletions` 统一处理工具调用与流式语义，最后再转换回原协议响应。
@@ -111,7 +111,6 @@ flowchart LR
 | P0 | Anthropic SDK（messages） | ✅ |
 | P0 | Google Gemini SDK（generateContent） | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI（OpenAI 兼容接入） | ✅ |
-| P2 | MCP 独立桥接层 | 规划中 |
 
 ## 模型支持
 
@@ -289,7 +288,8 @@ cp opencode.json.example opencode.json
     "o3": "deepseek-reasoner"
   },
   "compat": {
-    "wide_input_strict_output": true
+    "wide_input_strict_output": true,
+    "strip_reference_markers": true
   },
   "responses": {
     "store_ttl_seconds": 900
@@ -311,7 +311,7 @@ cp opencode.json.example opencode.json
     "token_refresh_interval_hours": 6
   },
   "auto_delete": {
-    "sessions": false
+    "mode": "none"
   }
 }
 ```
@@ -321,7 +321,8 @@ cp opencode.json.example opencode.json
 - `token`：配置文件中即使填写也会在加载时被清空（不会从 `config.json` 读取 token）；实际 token 仅在运行时内存中维护并自动刷新
 - `model_aliases`：常见模型名（如 GPT/Codex/Claude）到 DeepSeek 模型的映射
 - `compat.wide_input_strict_output`：建议保持 `true`（当前实现默认宽进严出）
-- `toolcall`：策略已固定为特征匹配 + 高置信早发，不再作为可配置项
+- `compat.strip_reference_markers`：建议保持 `true`，用于清理可见输出中的引用/标记
+- `toolcall`：旧字段，当前实现已固定为特征匹配 + 高置信早发；即使保留在配置里也会被忽略
 - `responses.store_ttl_seconds`：`/v1/responses/{id}` 的内存缓存 TTL
 - `embeddings.provider`：embedding 提供方（当前内置 `deterministic/mock/builtin`）
 - `claude_mapping`：字典中 `fast`/`slow` 后缀映射到对应 DeepSeek 模型（兼容读取 `claude_model_mapping`）
@@ -352,9 +353,6 @@ cp opencode.json.example opencode.json
 | `DS2API_GLOBAL_MAX_INFLIGHT` | 全局最大 in-flight 请求数 | `recommended_concurrency` |
 | `DS2API_VERCEL_INTERNAL_SECRET` | Vercel 混合流式内部鉴权密钥 | 回退用 `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease 过期秒数 | `900` |
-| `DS2API_DEV_PACKET_CAPTURE` | 本地开发抓包开关（记录最近会话请求/响应体） | 本地非 Vercel 默认开启 |
-| `DS2API_DEV_PACKET_CAPTURE_LIMIT` | 本地抓包保留条数（超出自动淘汰） | `5` |
-| `DS2API_DEV_PACKET_CAPTURE_MAX_BODY_BYTES` | 单条响应体最大记录字节数 | `2097152` |
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
@@ -450,6 +448,7 @@ ds2api/
 │   ├── deepseek/            # DeepSeek API 客户端、PoW WASM
 │   ├── js/                  # Node 运行时流式处理与兼容逻辑
 │   ├── devcapture/          # 开发抓包模块
+│   ├── rawsample/           # 原始流样本可见文本提取与回放辅助
 │   ├── format/              # 输出格式化
 │   ├── prompt/              # Prompt 构建
 │   ├── server/              # HTTP 路由与中间件（chi router）
@@ -471,6 +470,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # 兼容性测试夹具与期望输出
 │   ├── node/                # Node 侧单元测试（chat-stream / tool-sieve）
+│   ├── raw_stream_samples/  # 原始 SSE 样本与回放元数据
 │   └── scripts/             # 统一测试脚本入口（unit/e2e）
 ├── docs/                    # 部署 / 贡献 / 测试等辅助文档
 ├── static/admin/            # WebUI 构建产物（不提交到 Git）
